@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
             console.log('Returning cached result (scanned within last 4 hours) for:', targetUrl);
             return NextResponse.json(cachedData);
         }
-        
+
         console.log('No recent cache found, performing fresh scan for:', targetUrl);
 
         // 2. Scrape the HTML
@@ -64,21 +64,21 @@ export async function POST(req: NextRequest) {
 
         // COMPREHENSIVE DATA EXTRACTION
         const baseUrl = new URL(targetUrl);
-        
+
         // 1. Basic SEO & Structured Data
         const title = $('title').text();
         const metaDescription = $('meta[name="description"]').attr('content') || '';
         const metaKeywords = $('meta[name="keywords"]').attr('content') || '';
         const ogTitle = $('meta[property="og:title"]').attr('content') || '';
         const ogDescription = $('meta[property="og:description"]').attr('content') || '';
-        
+
         // 2. Extract ALL headings for context
         const headings = {
             h1: $('h1').map((_, el) => $(el).text().trim()).get().join(' | '),
             h2: $('h2').map((_, el) => $(el).text().trim()).get().join(' | '),
             h3: $('h3').map((_, el) => $(el).text().trim()).get().join(' | '),
         };
-        
+
         // 3. Extract JSON-LD structured data
         let structuredData = '';
         $('script[type="application/ld+json"]').each((_, el) => {
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
                 // Invalid JSON, skip
             }
         });
-        
+
         // 4. COMPREHENSIVE pricing extraction
         const priceSelectors = [
             '[class*="price"]', '[id*="price"]', '[class*="pricing"]', '[id*="pricing"]',
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
             '.cost', '.amount', '.fee', '.rate', '[class*="plan"]', '[id*="plan"]',
             '[class*="tier"]', '[id*="tier"]', 'table', '.package', '.subscription'
         ];
-        
+
         let pricingElements: string[] = [];
         priceSelectors.forEach(selector => {
             try {
@@ -113,15 +113,15 @@ export async function POST(req: NextRequest) {
                 // Ignore selector errors
             }
         });
-        
+
         // 5. Extract buy buttons and CTAs
         const buyButtonSelectors = [
             'button', 'a[href*="buy"]', 'a[href*="cart"]', 'a[href*="checkout"]',
-            'a[href*="purchase"]', '[class*="cta"]', '[id*="cta"]', 
+            'a[href*="purchase"]', '[class*="cta"]', '[id*="cta"]',
             '[class*="buy"]', '[class*="cart"]', '[class*="checkout"]',
             'input[type="submit"]', '[role="button"]'
         ];
-        
+
         let buyButtons: string[] = [];
         buyButtonSelectors.forEach(selector => {
             try {
@@ -136,19 +136,19 @@ export async function POST(req: NextRequest) {
                 // Ignore errors
             }
         });
-        
+
         // 6. Find relevant sub-pages
         const relevantLinks: string[] = [];
         $('a[href]').each((_, el) => {
             const href = $(el).attr('href') || '';
             const text = $(el).text().trim().toLowerCase();
-            
+
             // Look for pricing, product, buy pages
             if (href && (
-                href.includes('pricing') || href.includes('price') || 
-                href.includes('buy') || href.includes('shop') || 
+                href.includes('pricing') || href.includes('price') ||
+                href.includes('buy') || href.includes('shop') ||
                 href.includes('product') || href.includes('plans') ||
-                text.includes('pricing') || text.includes('buy') || 
+                text.includes('pricing') || text.includes('buy') ||
                 text.includes('shop') || text.includes('plans')
             )) {
                 try {
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
                 }
             }
         });
-        
+
         // 7. Scrape up to 3 most relevant sub-pages
         let subPagesContent = '';
         for (let i = 0; i < Math.min(3, relevantLinks.length); i++) {
@@ -175,11 +175,11 @@ export async function POST(req: NextRequest) {
                     redirect: 'follow',
                     signal: AbortSignal.timeout(5000), // 5 second timeout per sub-page
                 });
-                
+
                 if (subResponse.ok) {
                     const subHtml = await subResponse.text();
                     const $sub = cheerio.load(subHtml);
-                    
+
                     // Extract pricing info from sub-page
                     const subPricing = $sub('[class*="price"], [id*="price"], [class*="pricing"]').text();
                     const subContent = $sub('body').text().replace(/\s+/g, ' ').substring(0, 5000);
@@ -190,10 +190,10 @@ export async function POST(req: NextRequest) {
                 // Continue with other pages
             }
         }
-        
+
         // 8. Get FULL body content (no limits)
         const fullBodyText = $('body').text().replace(/\s+/g, ' ');
-        
+
         // 9. Combine everything for AI analysis
         const contentForAI = `
 WEBSITE ANALYSIS FOR: ${targetUrl}
@@ -258,44 +258,54 @@ RETURN ONLY VALID JSON with fields: product_name, price, currency, buy_link_foun
         const userPrompt = contentForAI;
 
         let geminiError: any = null;
-        
+
         // Try Gemini first if available
         if (genAI) {
             console.log('Attempting Google Generative AI (Gemini)');
-            try {
-                const model = genAI.getGenerativeModel({
-                    model: 'gemini-2.5-flash', // Using 2.5-flash model
-                    generationConfig: {}
-                });
-                const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`);
-                const text = result.response.text();
-                console.log('Gemini raw response:', text);
-                
-                // Strip markdown code blocks if present
-                let jsonText = text.trim();
-                if (jsonText.startsWith('```json')) {
-                    jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-                } else if (jsonText.startsWith('```')) {
-                    jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-                }
-                
+            // List of models to try in order of preference
+            const geminiModels = ['gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+
+            for (const modelName of geminiModels) {
+                if (analysis.product_name) break; // Stop if we already have a result
+
                 try {
-                    analysis = JSON.parse(jsonText);
-                    console.log('✓ Successfully analyzed with Gemini');
-                } catch (parseErr: any) {
-                    console.error('Failed to parse Gemini JSON:', parseErr, 'raw:', text);
-                    return NextResponse.json({ error: 'AI returned invalid JSON (Gemini)', raw: text }, { status: 502 });
-                }
-            } catch (aiError: any) {
-                console.error('Gemini error:', aiError.message);
-                geminiError = aiError;
-                
-                // Check if it's a quota/rate limit error
-                if (aiError.message?.includes('quota') || aiError.message?.includes('429') || aiError.message?.includes('rate limit')) {
-                    console.log('Gemini quota exceeded, will try OpenAI fallback if available');
-                } else {
-                    // For non-quota errors, fail immediately
-                    throw new Error(`AI Analysis failed (Gemini): ${aiError.message}`);
+                    console.log(`Trying Gemini model: ${modelName}`);
+                    const model = genAI.getGenerativeModel({
+                        model: modelName,
+                        generationConfig: {}
+                    });
+                    const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`);
+                    const text = result.response.text();
+                    console.log(`Gemini ${modelName} raw response:`, text.substring(0, 100) + '...');
+
+                    // Strip markdown code blocks if present
+                    let jsonText = text.trim();
+                    if (jsonText.startsWith('```json')) {
+                        jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+                    } else if (jsonText.startsWith('```')) {
+                        jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+                    }
+
+                    try {
+                        analysis = JSON.parse(jsonText);
+                        console.log(`✓ Successfully analyzed with Gemini (${modelName})`);
+                    } catch (parseErr: any) {
+                        console.error(`Failed to parse Gemini ${modelName} JSON:`, parseErr);
+                        // Don't throw here, just let it try the next model or fallback
+                    }
+                } catch (aiError: any) {
+                    console.error(`Gemini ${modelName} error:`, aiError.message);
+                    geminiError = aiError;
+
+                    // Check if it's a quota/rate limit error or overload
+                    if (aiError.message?.includes('quota') || aiError.message?.includes('429') || aiError.message?.includes('503') || aiError.message?.includes('overloaded')) {
+                        console.log(`Gemini ${modelName} overloaded or rate limited, trying next model...`);
+                        continue; // Try next model
+                    } else {
+                        // For other errors (like invalid API key), maybe we shouldn't keep trying? 
+                        // But to be safe and robust, we'll continue to the next model anyway in case it's model-specific.
+                        continue;
+                    }
                 }
             }
         }
@@ -314,29 +324,27 @@ RETURN ONLY VALID JSON with fields: product_name, price, currency, buy_link_foun
                 });
                 const content = completion.choices[0].message.content || '{}';
                 const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
-                console.log('OpenAI raw response:', contentStr);
+                console.log('OpenAI raw response:', contentStr.substring(0, 100) + '...');
                 try {
                     analysis = JSON.parse(contentStr);
                     console.log('✓ Successfully analyzed with OpenAI');
                 } catch (parseErr: any) {
-                    console.error('Failed to parse OpenAI JSON:', parseErr, 'raw:', contentStr);
-                    return NextResponse.json({ error: 'AI returned invalid JSON (OpenAI)', raw: contentStr }, { status: 502 });
+                    console.error('Failed to parse OpenAI JSON:', parseErr);
+                    // Fallthrough to error handling
                 }
             } catch (aiError: any) {
                 console.error('OpenAI error:', aiError);
-                throw new Error(`AI Analysis failed (OpenAI): ${aiError.message}`);
+                // Fallthrough to error handling
             }
         }
 
-        // If still no analysis, return appropriate error
+        // If still no analysis, return generic overloaded message
         if (!analysis.product_name) {
-            if (geminiError) {
-                return NextResponse.json({ 
-                    error: 'AI quota exceeded. Please add an OPENAI_API_KEY to your .env.local file for fallback, or wait for your Gemini quota to reset.',
-                    details: geminiError.message 
-                }, { status: 429 });
-            }
-            return NextResponse.json({ error: 'No AI provider available. Please set OPENAI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY' }, { status: 500 });
+            console.error('All AI models failed or returned invalid data.');
+            return NextResponse.json({
+                error: 'Our systems are currently overloaded with high demand. Please try again in a few moments.',
+                code: 'SYSTEM_OVERLOADED'
+            }, { status: 503 });
         }
 
         // 4. Cache to Supabase
