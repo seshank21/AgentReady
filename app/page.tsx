@@ -96,7 +96,7 @@ export default function Home() {
   };
 
   const shareOnX = () => {
-    const text = `My site is ${result.agent_readability_score < 50 ? 'INVISIBLE' : 'OPTIMIZED'} for AI Agents! 🤖\n\nAgentReady Score: ${result.agent_readability_score}/100\n\nCheck yours at AgentReady.ai #${result.agent_readability_score > 50 ? 'AIReady' : 'SEO'}`;
+    const text = `My site is ${result.agent_readability_score < 50 ? 'INVISIBLE' : 'OPTIMIZED'} for AI Agents! 🤖\n\nAgentReady Score: ${result.agent_readability_score}/100\n\nCheck yours at agentready-o0gjprt5f-venkataseshanka-gmailcoms-projects.vercel.app #${result.agent_readability_score > 50 ? 'AIReady' : 'SEO'}`;
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(twitterUrl, '_blank');
   };
@@ -322,7 +322,9 @@ export default function Home() {
                 onClick={shareOnX}
                 className="w-full sm:w-auto bg-white hover:bg-zinc-100 text-black font-semibold px-8 sm:px-12 h-12 sm:h-14 rounded-xl flex gap-3 items-center justify-center shadow-[0_4px_20px_rgba(255,255,255,0.1)] transition-all hover:shadow-[0_4px_24px_rgba(255,255,255,0.15)]"
               >
-                <Twitter className="w-5 h-5" />
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+                  <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
+                </svg>
                 Share Report
               </Button>
               <Button
@@ -363,7 +365,7 @@ function MetricCard({ icon, label, value, status, isSuccess }: any) {
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className={`p-1.5 sm:p-2 rounded-lg ${isSuccess ? 'bg-green-400/15' : 'bg-red-400/15'}`}>
-            {React.cloneElement(icon, {
+            {React.cloneElement(icon as any, {
               className: `w-4 h-4 sm:w-5 sm:h-5 ${isSuccess ? 'text-green-400' : 'text-red-400'}`
             })}
           </div>
