@@ -363,7 +363,7 @@ function MetricCard({ icon, label, value, status, isSuccess }: any) {
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className={`p-1.5 sm:p-2 rounded-lg ${isSuccess ? 'bg-green-400/15' : 'bg-red-400/15'}`}>
-            {React.cloneElement(icon as React.ReactElement, {
+            {React.cloneElement(icon, {
               className: `w-4 h-4 sm:w-5 sm:h-5 ${isSuccess ? 'text-green-400' : 'text-red-400'}`
             })}
           </div>
