@@ -9,31 +9,43 @@ interface Scan {
   agent_readability_score: number;
 }
 
-export function NewsTicker() {
+interface NewsTickerProps {
+  title?: string;
+  endpoint?: string;
+  className?: string;
+  reverse?: boolean; // To scroll in opposite direction
+}
+
+export function NewsTicker({
+  title = "🔥 Top 10 Scans",
+  endpoint = "/api/top-scans",
+  className = "bottom-0 bg-zinc-950/95 border-t border-zinc-800/50",
+  reverse = false
+}: NewsTickerProps) {
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTopScans = async () => {
+    const fetchScans = async () => {
       try {
-        const response = await fetch('/api/top-scans');
+        const response = await fetch(endpoint);
         const data = await response.json();
         if (data.scans && data.scans.length > 0) {
           // Duplicate the array to create seamless loop
           setScans([...data.scans, ...data.scans]);
         }
       } catch (error) {
-        console.error('Failed to fetch top scans:', error);
+        console.error(`Failed to fetch scans from ${endpoint}:`, error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTopScans();
+    fetchScans();
     // Refresh every 30 seconds
-    const interval = setInterval(fetchTopScans, 30000);
+    const interval = setInterval(fetchScans, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [endpoint]);
 
   if (loading || scans.length === 0) {
     return null;
@@ -55,19 +67,20 @@ export function NewsTicker() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/95 border-t border-zinc-800/50 backdrop-blur-md overflow-hidden">
+    <div className={`fixed left-0 right-0 z-30 backdrop-blur-md overflow-hidden ${className}`}>
       <div className="flex items-center gap-4 py-3">
         {/* Label */}
         <div className="flex-shrink-0 px-4 sm:px-6">
           <span className="text-xs sm:text-sm font-semibold text-green-400 uppercase tracking-wider">
-            🔥 Top 10 Scans
+            {title}
           </span>
         </div>
 
         {/* Scrolling Content */}
         <div className="flex-1 overflow-hidden relative">
           <div
-            className="flex gap-8 whitespace-nowrap animate-marquee pause-on-hover"
+            className={`flex gap-8 whitespace-nowrap animate-marquee pause-on-hover ${reverse ? 'direction-reverse' : ''}`}
+            style={{ animationDirection: reverse ? 'reverse' : 'normal' }}
           >
             {scans.map((scan, index) => (
               <div

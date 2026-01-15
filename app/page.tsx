@@ -354,6 +354,12 @@ export default function Home() {
         </p>
       </footer>
 
+      <NewsTicker
+        title="⚡ Recent Scans"
+        endpoint="/api/recent-scans"
+        className="bottom-12 bg-zinc-950/80 border-t border-zinc-800/30"
+        reverse={true}
+      />
       <NewsTicker />
     </main>
   );
